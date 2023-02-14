@@ -11,6 +11,9 @@ def make_pin_from_json(
     session: requests.sessions.Session, json_, video_url: str = None
 ) -> Pin:
     """Creates a Pin object from a json dict received from Pinterest."""
+    if type(json_) != dict:
+        print(json_)
+        quit()
     return Pin(
         session,
         json_["grid_title"],
@@ -41,14 +44,15 @@ def get_pins(
     data = pins["resource_response"]["data"]
     if "results" in data:
         data = data["results"]
+    # results with type "story" need handling
     if ignore_ads:
         return [
             make_pin_from_json(session, p)
             for p in data
-            if "ad_destination_url" not in p
+            if ("ad_destination_url" not in p) and (p["type"] != "story")
         ]
     else:
-        return [make_pin_from_json(session, p) for p in data]
+        return [make_pin_from_json(session, p) for p in data if p["type"] != "story"]
 
 
 def make_request(
@@ -58,7 +62,12 @@ def make_request(
     e: endpoints.Endpoint = endpoint(*args, **kwargs)
     url = e.url
 
-    headers: dict = session.headers
+    try:
+        headers: dict = session.headers
+    except AttributeError as e:
+        print(session)
+        print(type(session))
+        quit()
     if e.fresh_headers:
         headers = e.headers
     else:
@@ -106,19 +115,19 @@ def get_pin(
         "props"
     ]["initialReduxState"]["resources"]["PinResource"]
     pin = pin[list(pin.keys())[0]]["data"]
-    return make_pin_from_json(pin, video_url)
+    return make_pin_from_json(session, pin, video_url)
 
 
 def download_pin(pin: Pin | int | str, filepath: str) -> str:
     """Downloads a pin, given a Pin object, a pin's id or a pin's url."""
     session = pin._session
     if type(pin) != Pin:
-        pin = get_pin(session, pin)
+        pin = get_pin(pin, session)
     if pin.media_type == "image":
         url = pin.images["orig"]["url"]
     else:
         if not pin.video_url:
-            pin.video_url = get_pin(session, pin.pin_id).video_url
+            pin.video_url = get_pin(pin.pin_id, session).video_url
         url = pin.video_url
     if not filepath:
         filepath = f"pin_{pin.pin_id}.{url.split('.')[-1]}"
