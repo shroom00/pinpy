@@ -35,11 +35,6 @@ class Client:
         with open(filename, "wb") as f:
             dill.dump(self.session, f)
 
-    def download_pin(
-        self, pin: Pin | int | str, filepath: str = None, overwrite: bool = False
-    ) -> str:
-        utils.download_pin(self.session, pin, filepath, overwrite)
-
     def login(self, email: str, password: str) -> requests.Response:
         """Logs into Pinterest using the default email/username option"""
         return utils.make_request(self.session, endpoints.Login, email, password)
