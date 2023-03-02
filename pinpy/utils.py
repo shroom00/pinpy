@@ -5,17 +5,12 @@ from .exceptions import PinterestError
 from .objects import Pin
 import requests
 import dill
+from os import path
 
 
-def make_pin_from_json(
-    session: requests.sessions.Session, json_, video_url: str = None
-) -> Pin:
+def make_pin_from_json(json_: dict, video_url: str = None) -> Pin:
     """Creates a Pin object from a json dict received from Pinterest."""
-    if type(json_) != dict:
-        print(json_)
-        quit()
     return Pin(
-        session,
         json_["grid_title"],
         json_["description"].strip(),
         json_["images"],
@@ -33,26 +28,41 @@ def make_pin_from_json(
     )
 
 
-def get_pins(
+def make_board_from_json(session: requests.sessions.Session, json: dict):
+    return
+
+
+def get_resource(resource: dict):
+    if resource["type"] == "pin":
+        resource = make_pin_from_json(resource)
+    elif resource["type"] == "board":
+        resource = make_board_from_json(resource)
+    else:
+        raise NotImplemented(f"Type: {resource['type']} needs to be implemented")
+    return resource
+
+
+def get_resources(
     pins: dict,
-    session: requests.sessions.Session = requests.sessions.Session(),
     ignore_ads: bool = True,
 ):
-    """Gets multiple pins from a page's json.
+    """Gets pins and boards from a results page's json.
     Used for home feed and search results.
     Ignores ads by default"""
     data = pins["resource_response"]["data"]
-    if "results" in data:
+    if "results" in data:  # is "results" always present? further enquiry needed.
         data = data["results"]
     # results with type "story" need handling
+    resources = []
     if ignore_ads:
-        return [
-            make_pin_from_json(session, p)
-            for p in data
-            if ("ad_destination_url" not in p) and (p["type"] != "story")
-        ]
+        for resource in data:
+            if ("ad_destination_url" not in resource) and (resource["type"] != "story"):
+                resources.append(get_resource(resource))
     else:
-        return [make_pin_from_json(session, p) for p in data if p["type"] != "story"]
+        for resource in data:
+            if resource["type"] != "story":
+                resources.append(get_resource(resource))
+    return resources
 
 
 def make_request(
@@ -62,12 +72,7 @@ def make_request(
     e: endpoints.Endpoint = endpoint(*args, **kwargs)
     url = e.url
 
-    try:
-        headers: dict = session.headers
-    except AttributeError as e:
-        print(session)
-        print(type(session))
-        quit()
+    headers: dict = session.headers
     if e.fresh_headers:
         headers = e.headers
     else:
@@ -118,9 +123,13 @@ def get_pin(
     return make_pin_from_json(session, pin, video_url)
 
 
-def download_pin(pin: Pin | int | str, filepath: str) -> str:
+def download_pin(
+    pin: Pin | int | str,
+    filename: str,
+    dir_filepath: str,
+    session: requests.sessions.Session,
+) -> str:
     """Downloads a pin, given a Pin object, a pin's id or a pin's url."""
-    session = pin._session
     if type(pin) != Pin:
         pin = get_pin(pin, session)
     if pin.media_type == "image":
@@ -129,8 +138,9 @@ def download_pin(pin: Pin | int | str, filepath: str) -> str:
         if not pin.video_url:
             pin.video_url = get_pin(pin.pin_id, session).video_url
         url = pin.video_url
-    if not filepath:
-        filepath = f"pin_{pin.pin_id}.{url.split('.')[-1]}"
-    with open(filepath, "wb") as f:
+    if not filename:
+        filename = f"pin_{pin.pin_id}.{url.split('.')[-1]}"
+    fp = path.join(dir_filepath, filename)
+    with open(fp, "wb") as f:
         f.write(session.get(url).content)
-    return filepath
+    return fp
