@@ -1,7 +1,7 @@
-from typing import Literal
+from typing import List, Literal, Optional
 import requests
 from . import endpoints, utils
-from .objects import Pin, Results
+from .objects import Board, Pin, Results
 import dill
 
 
@@ -35,6 +35,37 @@ class Client:
         with open(filename, "wb") as f:
             dill.dump(self.session, f)
 
+    def download_pin(
+        self, pin: Pin | int | str, filename: str = "", dir_filepath: str = ""
+    ) -> str:
+        return utils.download_pin(pin, filename, dir_filepath, self.session)
+
+    def download_board(
+        self, board: Board, dir_filepath: str = "", amount: int = 0
+    ) -> List[str]:
+        if amount == 0:
+            amount = len(board)
+        return [
+            self.download_pin(pin, dir_filepath=dir_filepath) for pin in board[:amount]
+        ]
+
+    def download_results(
+        self, results: Results, dir_filepath: str = "", amount: int = 0
+    ) -> List[str]:
+        if amount == 0:
+            amount = len(results)
+        return [
+            self.download_board(result, dir_filepath)
+            if type(result) == Board
+            else self.download_pin(result, dir_filepath=dir_filepath)
+            for result in results[:amount]
+        ]
+
+    def next_results_page(self, results: Results) -> Optional[Results]:
+        if results._next_bookmark == "-end-":
+            return None
+        return self.search(results._query, results._scope, results._next_bookmark)
+
     def login(self, email: str, password: str) -> requests.Response:
         """Logs into Pinterest using the default email/username option"""
         return utils.make_request(self.session, endpoints.Login, email, password)
@@ -42,23 +73,22 @@ class Client:
     def get_homefeed(self, bookmark: str = "") -> Results:
         """Refreshes the authenticated user's homefeed and returns a list of pins."""
         response = utils.make_request(self.session, endpoints.GetHomefeed).json()
-        pins = utils.get_pins(response, self.session)
+        pins = utils.get_resources(response, self.session)
         next_bookmark = response["resource"]["options"]["bookmarks"][0]
-        return Results(self, "", "", pins, bookmark, next_bookmark)
+        warnings = response["resource_response"]["data"]["nag"]
+        return Results("", "", pins, warnings, bookmark, next_bookmark)
 
     def search(
         self,
         query: str,
-        scope: Literal["pins"] | Literal["videos"] | Literal["boards"] = "pins",
+        scope: Literal["pins", "videos", "boards"] = "pins",
         bookmark: str = "",
     ) -> Results:
         """Searches Pinterest and returns a list of pins."""
         response = utils.make_request(
             self.session, endpoints.Search, query, scope, bookmark
         ).json()
-        pins = utils.get_pins(response, self.session)
+        pins = utils.get_resources(response, self.session)
         next_bookmark = response["resource"]["options"]["bookmarks"][0]
-        warn = response["resource_response"]["data"]["nag"]
-        if warn:
-            print(f"----- Pinterest Warning: {' '.join(warn['messages'])} -----")
-        return Results(self, query, scope, pins, bookmark, next_bookmark)
+        warnings = response["resource_response"]["data"]["nag"]
+        return Results(query, scope, pins, warnings, bookmark, next_bookmark)
