@@ -1,13 +1,11 @@
 from dataclasses import dataclass, field
-from typing import List, Optional
-from . import utils
+from typing import List
 
 
 @dataclass
 class Pin:
     """Class representing a Pinterest pin."""
 
-    _session: object = field(repr=False)
     title: str
     description: str
     images: list[dict] | str = field(repr=False)
@@ -22,9 +20,6 @@ class Pin:
     board_id: int = field(repr=False)
     board_url: str
     media_type: str
-
-    def download(self, filepath: str = "") -> str:
-        return utils.download_pin(self, filepath)
 
     def __hash__(self) -> int:
         return self.pin_id
@@ -41,27 +36,33 @@ class User:
 class Board:
     """Class representing a Pinterest board."""
 
-    pass
+    name: str
+    description: str
+    url: str
+    pin_count: int
+    board_id: int
+    owner: str  # username?
+    followed: bool
+    collaborative: bool
+    privacy: str
+
+    def __len__(self) -> int:
+        return self.pin_count
 
 
 @dataclass
 class Results:
-    """Class representing a page of pins e.g. homefeed, search"""
+    """Class representing a page of results e.g. homefeed, search"""
 
-    _client: object
-    query: str
-    scope: str
-    pins: List[Pin]
-    bookmark: str
-    next_bookmark: str
-
-    def next_page(self) -> Optional["Results"]:
-        if self.next_bookmark == "-end-":
-            return None
-        return self._client.search(self.query, self.scope, self.next_bookmark)
+    _query: str
+    _scope: str
+    results: List[Pin | Board]
+    warnings: dict
+    _bookmark: str = field(repr=False)
+    _next_bookmark: str = field(repr=False)
 
     def __getitem__(self, index: int) -> Pin:
-        return self.pins[index]
+        return self.results[index]
 
     def __len__(self):
-        return len(self.pins)
+        return len(self.results)
