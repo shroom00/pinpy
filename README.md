@@ -16,7 +16,7 @@ Pinpy is a wrapper for the Pinterest web API. It aims to mimic requests made whe
 <h3 id="login">Logging in</h3>
 
 ```py
-from pinpy.main import Client
+from pinpy import Client
 
 
 cl = Client("username or email", "password")
@@ -48,7 +48,7 @@ cl = Client(session="session_file")
 **NOTE:** Searching doesn't require a login.
 
 ```py
-from pinpy.main import Client
+from pinpy import Client
 
 
 cl = Client()
@@ -65,7 +65,8 @@ When iterating over the results, `Pin` objects are returned. `Pin` objects repre
 pins = cl.search("football")
 
 for pin in pins:
-    pin.download("filepath")
+    download_pin(pin)
+
 ```
 
 Downloading a pin will return the filepath of the image/video downlaoded. The filepath is optional; a name will be chosen automatically if one isn't given. (The naming format is "pin_(pin_id).filetype")

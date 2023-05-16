@@ -125,9 +125,9 @@ def get_pin(
 
 def download_pin(
     pin: Pin | int | str,
-    filename: str,
-    dir_filepath: str,
-    session: requests.sessions.Session,
+    filename: str | None = None,
+    dir_filepath: str = "",
+    session: requests.sessions.Session = requests.sessions.session(),
 ) -> str:
     """Downloads a pin, given a Pin object, a pin's id or a pin's url."""
     if type(pin) != Pin:
